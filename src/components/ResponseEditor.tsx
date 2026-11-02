@@ -1,12 +1,18 @@
 import { ClipboardPaste } from 'lucide-react';
-import { useState } from 'react';
+import { type Ref, useImperativeHandle, useRef, useState } from 'react';
 import { parseCard } from '../lib/cardParser';
 import { saveResponse } from '../lib/repo';
-import { toast } from '../store';
+import { askSaveChanges, toast } from '../store';
 import { type BankResponse, KIND_NAMES, RESPONSE_KINDS, type ResponseKind } from '../types';
 import { KindBadge } from './KindBadge';
 
+export interface ResponseEditorHandle {
+  /** Close the editor, asking first if there are unsaved edits. */
+  requestClose: () => void;
+}
+
 interface Props {
+  ref?: Ref<ResponseEditorHandle>;
   argumentId: string;
   /** Editing a frontline for your own contention rather than a response to theirs. */
   frontline?: boolean;
@@ -14,7 +20,7 @@ interface Props {
   onDone: (saved?: BankResponse) => void;
 }
 
-export function ResponseEditor({ argumentId, frontline = false, initial, onDone }: Props) {
+export function ResponseEditor({ ref, argumentId, frontline = false, initial, onDone }: Props) {
   const [kind, setKind] = useState<ResponseKind>(initial?.kind ?? (frontline ? 'OTHER' : 'NU'));
   const [against, setAgainst] = useState(initial?.against ?? '');
   const [isCard, setIsCard] = useState(initial?.isCard ?? false);
@@ -24,6 +30,28 @@ export function ResponseEditor({ argumentId, frontline = false, initial, onDone 
   const [text, setText] = useState(initial?.text ?? '');
   const [strength, setStrength] = useState<1 | 2 | 3>(initial?.strength ?? 2);
   const [paste, setPaste] = useState('');
+
+  // What the fields held when the editor opened, to tell whether anything changed.
+  const fields = { kind, against, isCard, tag, cite, url, text, strength };
+  const [start] = useState(() => JSON.stringify(fields));
+  const dirty = JSON.stringify(fields) !== start;
+  const asking = useRef(false);
+
+  useImperativeHandle(ref, () => ({
+    requestClose: async () => {
+      if (!dirty) return onDone();
+      // Esc can reach both this editor's dialog and the question; ask only once.
+      if (asking.current) return;
+      asking.current = true;
+      const choice = await askSaveChanges();
+      asking.current = false;
+      if (choice === 'discard') onDone();
+      else if (choice === 'save') {
+        if (tag.trim()) await save();
+        else toast(`Add ${frontline ? 'your frontline' : 'a tag'} before saving.`, 'error');
+      }
+    },
+  }));
 
   const applyPaste = (raw: string) => {
     const p = parseCard(raw);

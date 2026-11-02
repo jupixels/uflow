@@ -145,7 +145,9 @@ export const useApp = create<AppState>()(
       selectCase: (caseId) => set({ caseId }),
       practiceArgument: (practiceArgumentId) => set(practiceArgumentId ? { practiceArgumentId, view: 'practice' } : { practiceArgumentId }),
       setCxAuto: (cxAuto) => set({ cxAuto }),
-      selectResolution: (resolutionId) => set({ resolutionId, argumentId: null, caseId: null }),
+      // Re-selecting the current resolution (e.g. when the sample bank finishes loading) keeps the open argument.
+      selectResolution: (resolutionId) =>
+        set(resolutionId === get().resolutionId ? {} : { resolutionId, argumentId: null, caseId: null }),
       selectArgument: (argumentId) => set({ argumentId }),
       openRound: (roundId, prepSeconds, defaultSheet, firstSegment) => {
         const same = get().timers.roundId === roundId;
@@ -234,28 +236,55 @@ export const useToasts = create<{ toasts: Toast[]; push: (message: string, tone?
 
 export const toast = (message: string, tone?: Toast['tone']) => useToasts.getState().push(message, tone);
 
+export interface ConfirmChoice {
+  id: string;
+  label: string;
+  tone: 'danger' | 'primary' | 'plain';
+}
+
 interface ConfirmRequest {
   title: string;
   body?: string;
-  confirmLabel?: string;
-  resolve: (ok: boolean) => void;
+  cancelLabel: string;
+  /** Buttons after Cancel; the last one gets focus. */
+  choices: ConfirmChoice[];
+  /** The chosen id, or null for Cancel / Esc / click outside. */
+  resolve: (choice: string | null) => void;
 }
 
 export const useConfirmStore = create<{ request: ConfirmRequest | null }>()(() => ({ request: null }));
 
-/** Promise-based replacement for window.confirm, rendered by <ConfirmDialog />. */
-export function confirmAction(title: string, body?: string, confirmLabel = 'Delete'): Promise<boolean> {
+function ask(title: string, body: string | undefined, choices: ConfirmChoice[], cancelLabel = 'Cancel'): Promise<string | null> {
   return new Promise((resolve) => {
     useConfirmStore.setState({
       request: {
         title,
         body,
-        confirmLabel,
-        resolve: (ok) => {
+        cancelLabel,
+        choices,
+        resolve: (choice) => {
           useConfirmStore.setState({ request: null });
-          resolve(ok);
+          resolve(choice);
         },
       },
     });
   });
+}
+
+/** Promise-based replacement for window.confirm, rendered by <ConfirmDialog />. */
+export async function confirmAction(title: string, body?: string, confirmLabel = 'Delete'): Promise<boolean> {
+  return (await ask(title, body, [{ id: 'ok', label: confirmLabel, tone: 'danger' }])) === 'ok';
+}
+
+/** Ask before closing an editor with unsaved edits. Null means keep editing. */
+export async function askSaveChanges(): Promise<'save' | 'discard' | null> {
+  return (await ask(
+    'Save your changes?',
+    'You edited this but haven’t saved it yet.',
+    [
+      { id: 'discard', label: 'Don’t save', tone: 'plain' },
+      { id: 'save', label: 'Save', tone: 'primary' },
+    ],
+    'Keep editing',
+  )) as 'save' | 'discard' | null;
 }

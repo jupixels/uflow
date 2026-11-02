@@ -88,22 +88,30 @@ export function ConfirmDialog() {
     okRef.current?.focus();
   }, [request]);
   if (!request) return null;
+  const tone = {
+    danger: 'border-transparent bg-danger text-white hover:border-transparent hover:bg-danger/90',
+    primary: 'btn-primary',
+    plain: '',
+  };
   return (
-    <Modal label={request.title} onClose={() => request.resolve(false)} width="max-w-sm" align="center">
+    <Modal label={request.title} onClose={() => request.resolve(null)} width="max-w-sm" align="center">
       <div className="p-5">
         <h2 className="font-semibold">{request.title}</h2>
         {request.body && <p className="mt-1.5 text-sm text-muted">{request.body}</p>}
-        <div className="mt-5 flex justify-end gap-2">
-          <button className="btn" onClick={() => request.resolve(false)}>
-            Cancel
+        <div className="mt-5 flex flex-wrap justify-end gap-2">
+          <button className="btn btn-ghost" onClick={() => request.resolve(null)}>
+            {request.cancelLabel}
           </button>
-          <button
-            ref={okRef}
-            className="btn border-transparent bg-danger text-white hover:border-transparent hover:bg-danger/90"
-            onClick={() => request.resolve(true)}
-          >
-            {request.confirmLabel}
-          </button>
+          {request.choices.map((c, i) => (
+            <button
+              key={c.id}
+              ref={i === request.choices.length - 1 ? okRef : undefined}
+              className={`btn ${tone[c.tone]}`}
+              onClick={() => request.resolve(c.id)}
+            >
+              {c.label}
+            </button>
+          ))}
         </div>
       </div>
     </Modal>
