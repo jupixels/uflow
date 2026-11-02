@@ -1,4 +1,4 @@
-import type { BankResponse } from '../types';
+import type { BankResponse, FlowCell, ResponseKind } from '../types';
 
 const norm = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim();
 /** Enough of a tag to still recognise a line after small edits at the end of it. */
@@ -33,4 +33,27 @@ export function responseAtCaret(text: string, caret: number, present: BankRespon
   const end = text.indexOf('\n', caret);
   const line = text.slice(start, end === -1 ? undefined : end);
   return present.find((r) => lineHasResponse(line, r));
+}
+
+/**
+ * Type badges for a cell: the tag you set yourself (Alt+1–6) first, then the
+ * types of the bank responses still in it, without repeats. Inserted
+ * responses never set the cell's own tag, so their badges come and go with them.
+ */
+export function cellKinds(manual: ResponseKind | undefined, present: BankResponse[]): ResponseKind[] {
+  const kinds = manual ? [manual] : [];
+  for (const r of present) if (!kinds.includes(r.kind)) kinds.push(r.kind);
+  return kinds;
+}
+
+/**
+ * Before this fix, inserting a response copied its type onto the cell for good.
+ * A stored tag that matches one of the cell's inserted responses was almost
+ * certainly copied that way, so it is cleared; badges now come from the responses.
+ */
+export function withoutCopiedKind(cell: FlowCell, kindOf: (responseId: string) => ResponseKind | undefined): FlowCell {
+  if (!cell.kind || !cell.linkedResponseIds?.some((id) => kindOf(id) === cell.kind)) return cell;
+  const rest = { ...cell };
+  delete rest.kind;
+  return rest;
 }

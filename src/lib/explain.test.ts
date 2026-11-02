@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { BankResponse } from '../types';
-import { lineHasResponse, responseAtCaret, responsesInCell } from './explain';
+import type { FlowCell } from '../types';
+import { cellKinds, lineHasResponse, responseAtCaret, responsesInCell, withoutCopiedKind } from './explain';
 
 const resp = (id: string, tag: string): BankResponse => ({
   id,
@@ -39,5 +40,24 @@ describe('explain matching', () => {
     expect(responseAtCaret(text, text.indexOf('Alternatives') + 3, present)?.id).toBe('lt');
     expect(responseAtCaret(text, text.length, present)?.id).toBe('nu');
     expect(responseAtCaret(text, 2, present)).toBeUndefined();
+  });
+});
+
+describe('cell badges', () => {
+  const ltResp = { ...lt, kind: 'LINK_TURN' as const };
+
+  it('shows your own tag first, then the types of responses still in the cell', () => {
+    expect(cellKinds(undefined, [])).toEqual([]);
+    expect(cellKinds(undefined, [nu, ltResp])).toEqual(['NU', 'LINK_TURN']);
+    expect(cellKinds('WEIGHING', [nu, { ...nu, id: 'nu2' }])).toEqual(['WEIGHING', 'NU']);
+  });
+
+  it('clears a stored tag that was copied from an inserted response', () => {
+    const cell: FlowCell = { id: 'c', roundId: 'r', rowId: 'w', speech: 'PR', text: '', kind: 'NU', linkedResponseIds: ['nu'] };
+    const kindOf = (id: string) => byId.get(id)?.kind;
+    expect(withoutCopiedKind(cell, kindOf).kind).toBeUndefined();
+    // A tag that doesn't match any inserted response was set by hand: keep it.
+    expect(withoutCopiedKind({ ...cell, kind: 'WEIGHING' }, kindOf).kind).toBe('WEIGHING');
+    expect(withoutCopiedKind({ ...cell, linkedResponseIds: [] }, kindOf).kind).toBe('NU');
   });
 });

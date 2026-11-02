@@ -2,7 +2,7 @@ import { useEffect, useImperativeHandle, useRef, useState, type Ref } from 'reac
 import { useAutosize } from '../hooks/useAutosize';
 import { updateCell } from '../lib/repo';
 import { BookOpen } from 'lucide-react';
-import type { FlowCell, Speech } from '../types';
+import type { FlowCell, ResponseKind, Speech } from '../types';
 import { KindBadge } from './KindBadge';
 
 export interface CellHandle {
@@ -22,6 +22,8 @@ interface Props {
   placeholder?: string;
   onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   onFocus: () => void;
+  /** Type badges to show: your own tag, then the types of bank responses in the cell. */
+  kinds?: ResponseKind[];
   /** How many inserted bank responses are still in the cell; shows the book marker. */
   bankCount?: number;
   onExplain?: () => void;
@@ -29,7 +31,7 @@ interface Props {
 
 const SAVE_DELAY = 300;
 
-export function FlowCellEditor({ ref, roundId, rowId, speech, cell, width, placeholder, onKeyDown, onFocus, bankCount = 0, onExplain }: Props) {
+export function FlowCellEditor({ ref, roundId, rowId, speech, cell, width, placeholder, onKeyDown, onFocus, kinds = [], bankCount = 0, onExplain }: Props) {
   const [text, setText] = useState(cell?.text ?? '');
   const saved = useRef(cell?.text ?? '');
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -75,7 +77,8 @@ export function FlowCellEditor({ ref, roundId, rowId, speech, cell, width, place
       const t = el.current;
       if (!t) return;
       t.focus();
-      if (atEnd) t.setSelectionRange(t.value.length, t.value.length);
+      const at = atEnd ? t.value.length : 0;
+      t.setSelectionRange(at, at);
     },
     appendLine: (line) => {
       const cur = latest.current;
@@ -102,9 +105,11 @@ export function FlowCellEditor({ ref, roundId, rowId, speech, cell, width, place
         }
       }}
     >
-      {cell?.kind && (
-        <span className="pointer-events-none absolute top-1.5 right-1.5">
-          <KindBadge kind={cell.kind} />
+      {kinds.length > 0 && (
+        <span className="pointer-events-none absolute top-1.5 right-1.5 flex flex-col items-end gap-0.5">
+          {kinds.map((k) => (
+            <KindBadge key={k} kind={k} />
+          ))}
         </span>
       )}
       {bankCount > 0 && (
@@ -132,7 +137,7 @@ export function FlowCellEditor({ ref, roundId, rowId, speech, cell, width, place
         spellCheck={false}
         style={{ fontSize: 'var(--flow-font)' }}
         className={`block min-h-[3.75rem] w-full resize-none overflow-hidden bg-transparent px-2.5 py-2 leading-snug outline-none placeholder:text-faint/70 focus-visible:outline-none ${
-          cell?.kind ? 'pr-10' : ''
+          kinds.length ? 'pr-10' : ''
         } ${bankCount > 0 ? 'pb-7' : ''}`}
       />
     </div>

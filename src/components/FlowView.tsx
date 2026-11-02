@@ -27,7 +27,8 @@ import { SaveToBankDialog } from './SaveToBankDialog';
 import { TimerBar } from './TimerBar';
 import { EmptyState } from './ui';
 import { useLabels } from '../hooks/useLabels';
-import { responseAtCaret, responsesInCell } from '../lib/explain';
+import { onFirstLine, onLastLine } from '../lib/caret';
+import { cellKinds, responseAtCaret, responsesInCell } from '../lib/explain';
 
 type Target = { rowId: string; speech: Speech };
 const key = (rowId: string, speech: Speech) => `${rowId}:${speech}`;
@@ -107,9 +108,9 @@ export function FlowView({ onShortcuts }: { onShortcuts: () => void }) {
   const segments = useMemo(() => roundSegments(firstSide), [firstSide]);
   const currentSpeech = segments.find((s) => s.id === timers.segmentId)?.speech;
 
-  const focus = useCallback((rowId: string, speech: Speech) => {
+  const focus = useCallback((rowId: string, speech: Speech, atEnd = true) => {
     const h = handles.current.get(key(rowId, speech));
-    if (h) h.focus();
+    if (h) h.focus(atEnd);
     else pendingFocus.current = key(rowId, speech);
   }, []);
 
@@ -137,6 +138,12 @@ export function FlowView({ onShortcuts }: { onShortcuts: () => void }) {
       const t = e.target as HTMLElement;
       // Ignore keys while typing or while any overlay (reading mode, dialogs, menus) is open.
       if (t.closest('input, textarea, select') || document.querySelector('[role="dialog"], [role="menu"]')) return;
+      // Alt+Z also closes the explanations panel when you're not in a cell.
+      if (e.altKey && e.code === 'KeyZ' && useApp.getState().panel === 'explain') {
+        e.preventDefault();
+        setPanel(null);
+        return;
+      }
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       if (e.code === 'Space') {
         e.preventDefault();
@@ -158,7 +165,7 @@ export function FlowView({ onShortcuts }: { onShortcuts: () => void }) {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [round, segments, toggleSpeech, togglePrep, selectSegment, togglePanel]);
+  }, [round, segments, toggleSpeech, togglePrep, selectSegment, togglePanel, setPanel]);
 
   if (!roundId || round === null) {
     return (
@@ -223,6 +230,20 @@ export function FlowView({ onShortcuts }: { onShortcuts: () => void }) {
       if (rows[r] && visible[c]) focus(rows[r].id, visible[c]);
       return;
     }
+    // Plain arrows move to the next cell once the caret can't go further in this one:
+    // up/down from the top/bottom visible line, left/right from the very start/end.
+    if (!e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && ta.selectionStart === ta.selectionEnd) {
+      const go = (r: FlowRow | undefined, s: Speech | undefined, atEnd: boolean) => {
+        if (!r || !s) return false;
+        e.preventDefault();
+        focus(r.id, s, atEnd);
+        return true;
+      };
+      if (e.key === 'ArrowUp' && onFirstLine(ta) && go(rows[rowIndex - 1], speech, true)) return;
+      if (e.key === 'ArrowDown' && onLastLine(ta) && go(rows[rowIndex + 1], speech, false)) return;
+      if (e.key === 'ArrowLeft' && ta.selectionStart === 0 && go(row, visible[col - 1], true)) return;
+      if (e.key === 'ArrowRight' && ta.selectionStart === ta.value.length && go(row, visible[col + 1], false)) return;
+    }
     if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
       e.preventDefault();
       const r = rows[rowIndex + (e.key === 'ArrowUp' ? -1 : 1)];
@@ -231,6 +252,11 @@ export function FlowView({ onShortcuts }: { onShortcuts: () => void }) {
     }
     if (e.altKey && e.code === 'KeyZ') {
       e.preventDefault();
+      // Alt+Z opens the explanations panel, and closes it again.
+      if (useApp.getState().panel === 'explain') {
+        setPanel(null);
+        return;
+      }
       const present = inCell(row.id, speech, ta.value);
       if (!present.length) {
         toast('No bank responses in this cell yet. Press / to insert one.');
@@ -495,6 +521,7 @@ export function FlowView({ onShortcuts }: { onShortcuts: () => void }) {
                             // An open explanations panel follows you to cells that have bank responses.
                             if (useApp.getState().panel === 'explain' && inCell(row.id, speech).length) setExplain({ rowId: row.id, speech });
                           }}
+                          kinds={cellKinds(cellMap.get(key(row.id, speech))?.kind, inCell(row.id, speech))}
                           bankCount={inCell(row.id, speech).length}
                           onExplain={() => {
                             setExplain({ rowId: row.id, speech });

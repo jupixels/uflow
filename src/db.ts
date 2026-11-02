@@ -1,4 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie';
+import { withoutCopiedKind } from './lib/explain';
 import type {
   Argument,
   BankResponse,
@@ -49,6 +50,18 @@ export class FlowDB extends Dexie {
     this.version(4).stores({
       reviews: 'id, due',
     });
+    // No schema change: clear cell tags that were copied from inserted responses.
+    this.version(5)
+      .stores({})
+      .upgrade(async (tx) => {
+        const kinds = new Map((await tx.table('responses').toArray()).map((r: BankResponse) => [r.id, r.kind]));
+        await tx
+          .table('cells')
+          .toCollection()
+          .modify((cell: FlowCell, ref: { value: FlowCell }) => {
+            ref.value = withoutCopiedKind(cell, (id) => kinds.get(id));
+          });
+      });
   }
 }
 

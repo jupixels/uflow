@@ -156,7 +156,8 @@ export async function recordInsert(roundId: string, rowId: string, speech: Speec
     const ids = cell.linkedResponseIds.includes(response.id)
       ? cell.linkedResponseIds
       : [...cell.linkedResponseIds, response.id];
-    await db.cells.update(cell.id, { linkedResponseIds: ids, kind: cell.kind ?? response.kind });
+    // The response's type shows as a badge while it's in the cell; it doesn't become the cell's own tag.
+    await db.cells.update(cell.id, { linkedResponseIds: ids });
     await db.responses.update(response.id, { timesUsed: response.timesUsed + 1 });
   });
 }
