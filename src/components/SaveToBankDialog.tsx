@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { parseCard } from '../lib/cardParser';
 import { createArgument } from '../lib/repo';
 import type { Argument, ResponseKind, Side } from '../types';
-import { ResponseEditor } from './ResponseEditor';
+import { ResponseEditor, type ResponseEditorHandle } from './ResponseEditor';
 import { Modal, ModalHeader } from './ui';
 import { useLabels } from '../hooks/useLabels';
 
@@ -26,10 +26,13 @@ export function SaveToBankDialog(p: Props) {
   const parsed = parseCard(p.text);
   const sideArgs = p.args.filter((a) => a.side === p.sheet);
   const label = useLabels();
+  const editorRef = useRef<ResponseEditorHandle>(null);
+  // Once the response editor is showing, closing asks about unsaved edits first.
+  const close = () => (editorRef.current ? editorRef.current.requestClose() : p.onClose());
 
   return (
-    <Modal label="Save to bank" onClose={p.onClose} width="max-w-2xl">
-      <ModalHeader title="Save to bank" subtitle="Reuse this response next time you hit the argument." onClose={p.onClose} />
+    <Modal label="Save to bank" onClose={close} width="max-w-2xl">
+      <ModalHeader title="Save to bank" subtitle="Reuse this response next time you hit the argument." onClose={close} />
       <div className="flex flex-wrap items-end gap-2 border-b border-line bg-surface-2 px-5 py-4">
         <div className="min-w-48 flex-1">
           <label className="label" htmlFor="saveArg">
@@ -60,6 +63,7 @@ export function SaveToBankDialog(p: Props) {
       </div>
       {argumentId ? (
         <ResponseEditor
+          ref={editorRef}
           key={argumentId}
           argumentId={argumentId}
           initial={{ ...parsed, kind: p.kind ?? 'OTHER' }}

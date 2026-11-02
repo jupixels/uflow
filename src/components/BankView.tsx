@@ -12,7 +12,7 @@ import {
   Sparkles,
   Trash2,
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { db } from '../db';
 import {
   createArgument,
@@ -30,7 +30,7 @@ import { loadSampleBank } from '../lib/sample';
 import { confirmAction, toast, useApp } from '../store';
 import { type Argument, type BankResponse, type CxQuestion, KIND_LABELS, KIND_NAMES, RESPONSE_KINDS, type ResponseKind, type Side } from '../types';
 import { KindBadge } from './KindBadge';
-import { ResponseEditor } from './ResponseEditor';
+import { ResponseEditor, type ResponseEditorHandle } from './ResponseEditor';
 import { EmptyState, Modal, ModalHeader } from './ui';
 import { useLabels } from '../hooks/useLabels';
 
@@ -341,6 +341,9 @@ export function ArgumentDetail({ argument, embedded = false }: { argument: Argum
   const [kindFilter, setKindFilter] = useState<ResponseKind | 'ALL'>('ALL');
   const [cardFilter, setCardFilter] = useState<'ALL' | 'CARD' | 'ANALYTIC'>('ALL');
   const [editing, setEditing] = useState<BankResponse | 'new' | null>(null);
+  const editorRef = useRef<ResponseEditorHandle>(null);
+  // X, Esc and clicking outside go through the editor so unsaved edits aren't lost.
+  const closeEditor = () => (editorRef.current ? editorRef.current.requestClose() : setEditing(null));
   const [renaming, setRenaming] = useState(false);
   const [title, setTitle] = useState(argument.title);
 
@@ -478,13 +481,19 @@ export function ArgumentDetail({ argument, embedded = false }: { argument: Argum
       )}
 
       {editing && (
-        <Modal label="Response" onClose={() => setEditing(null)} width="max-w-2xl">
+        <Modal label="Response" onClose={closeEditor} width="max-w-2xl">
           <ModalHeader
             title={editing === 'new' ? (own ? 'New frontline' : 'New response') : own ? 'Edit frontline' : 'Edit response'}
             subtitle={<>to “{argument.title}”</>}
-            onClose={() => setEditing(null)}
+            onClose={closeEditor}
           />
-          <ResponseEditor argumentId={argument.id} frontline={own} initial={editing === 'new' ? undefined : editing} onDone={() => setEditing(null)} />
+          <ResponseEditor
+            ref={editorRef}
+            argumentId={argument.id}
+            frontline={own}
+            initial={editing === 'new' ? undefined : editing}
+            onDone={() => setEditing(null)}
+          />
         </Modal>
       )}
     </div>
