@@ -1,6 +1,7 @@
 import { useEffect, useImperativeHandle, useRef, useState, type Ref } from 'react';
 import { useAutosize } from '../hooks/useAutosize';
 import { updateCell } from '../lib/repo';
+import { BookOpen } from 'lucide-react';
 import type { FlowCell, Speech } from '../types';
 import { KindBadge } from './KindBadge';
 
@@ -21,11 +22,14 @@ interface Props {
   placeholder?: string;
   onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   onFocus: () => void;
+  /** How many inserted bank responses are still in the cell; shows the book marker. */
+  bankCount?: number;
+  onExplain?: () => void;
 }
 
 const SAVE_DELAY = 300;
 
-export function FlowCellEditor({ ref, roundId, rowId, speech, cell, width, placeholder, onKeyDown, onFocus }: Props) {
+export function FlowCellEditor({ ref, roundId, rowId, speech, cell, width, placeholder, onKeyDown, onFocus, bankCount = 0, onExplain }: Props) {
   const [text, setText] = useState(cell?.text ?? '');
   const saved = useRef(cell?.text ?? '');
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -103,6 +107,18 @@ export function FlowCellEditor({ ref, roundId, rowId, speech, cell, width, place
           <KindBadge kind={cell.kind} />
         </span>
       )}
+      {bankCount > 0 && (
+        <button
+          type="button"
+          onClick={onExplain}
+          title="Show explanations (Alt+Z)"
+          aria-label={`Show explanations for ${bankCount} bank response${bankCount === 1 ? '' : 's'}`}
+          className="absolute right-1.5 bottom-1.5 z-[1] flex h-5 items-center gap-0.5 rounded-md border border-line bg-surface px-1 text-[0.65rem] font-semibold text-accent-text shadow-xs hover:border-accent hover:bg-accent-soft"
+        >
+          <BookOpen size={11} />
+          {bankCount}
+        </button>
+      )}
       <textarea
         ref={el}
         rows={2}
@@ -117,7 +133,7 @@ export function FlowCellEditor({ ref, roundId, rowId, speech, cell, width, place
         style={{ fontSize: 'var(--flow-font)' }}
         className={`block min-h-[3.75rem] w-full resize-none overflow-hidden bg-transparent px-2.5 py-2 leading-snug outline-none placeholder:text-faint/70 focus-visible:outline-none ${
           cell?.kind ? 'pr-10' : ''
-        }`}
+        } ${bankCount > 0 ? 'pb-7' : ''}`}
       />
     </div>
   );

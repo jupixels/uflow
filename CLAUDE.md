@@ -24,11 +24,12 @@ CI (`.github/workflows/ci.yml`) runs lint, typecheck, test and build. Run all fo
   - `repo.ts`: CRUD and cascades (deleting a resolution, argument, round, case or section also deletes what hangs off it).
   - `speeches.ts`: PF speech order, timings, default hidden columns. `labels.ts`: Pro/Con vs Aff/Neg display names.
   - `flashcards.ts`: Leitner scheduling (`rate`), study queue and deck counts for the Practice tab.
+  - `explain.ts`: which inserted bank responses are still in a cell's text (by tag, tolerant of small edits) and which one is on the caret line, for the explanations panel.
   - `summary.ts`: speech-builder analysis and outline. `caseTime.ts`: word counts and time estimates.
   - `data.ts`: JSON export/import. `timer.ts`: clocks. `search.ts`: Fuse search. `cardParser.ts`: paste-a-card splitting.
   - `theme.ts`, `install.ts`, `update.ts`: accent color wheel, PWA install prompt, auto-update rule.
 - `src/store.ts`: Zustand UI state (settings, selection, timers, side panel), persisted to localStorage, plus toasts and `confirmAction()`.
-- `src/components/`: one file per screen or panel (`BankView`, `CaseView`, `PracticeView`, `RoundsView`, `FlowView`, `CrossfirePanel`, `SummaryPanel`, `ReadingMode`, `SettingsPanel`). Shared pieces live in `ui.tsx`.
+- `src/components/`: one file per screen or panel (`BankView`, `CaseView`, `PracticeView`, `RoundsView`, `FlowView`, `CrossfirePanel`, `SummaryPanel`, `ExplainPanel`, `ReadingMode`, `SettingsPanel`). Shared pieces live in `ui.tsx`.
 - Tests sit next to the code as `*.test.ts`. Unit-test logic in `src/lib/`; components are checked by driving the built app in Playwright.
 
 ## Domain rules
@@ -46,6 +47,7 @@ CI (`.github/workflows/ci.yml`) runs lint, typecheck, test and build. Run all fo
 - **Vite `base` must stay `'./'`.** Hardcoding `/repo-name/` blanked the site when the repo was renamed. The service worker and manifest resolve relative to it too.
 - **One-line effects must not return a value.** `useEffect(() => el.scrollIntoView())` crashed the app: Chromium returns a Promise from `scrollIntoView`, and React then tries to call it as a cleanup function. Wrap effect bodies in braces.
 - **Read the time during render for timers.** Store clocks as `{ durationMs, elapsedMs, startedAt }` and compute with `remaining(clock, Date.now())`. `useTicker` only forces re-renders. Caching "now" in state once made timers show extra seconds on start.
+- Side panels share one slot (`store.panel`: `cx` | `summary` | `explain`). State a panel needs after leaving and returning to the Flow tab (e.g. `store.explain`) lives in the store, not component state.
 - **Global shortcuts** (Space, N, P, X, S in `FlowView`) must ignore typing and any open `[role="dialog"]` or `[role="menu"]`.
 - **Updates:** a browser refresh does not pick up a new deploy while the service worker serves the cache. `UpdateBanner` in `App.tsx` applies updates automatically within 20 s of opening (if no clock is running) and otherwise shows a banner. Never auto-reload mid-round.
 - **Blank-page fallback:** `index.html` shows a "didn't load" message after 8 s if `#root` is still empty. It lists failed file loads and errors, and has a **Reset app files** button that unregisters the service worker and clears caches (never IndexedDB). Keep it plain inline JS so it works even when the bundle doesn't.

@@ -12,6 +12,7 @@ const GROUPS: { title: string; items: [string[], string][] }[] = [
       [['Alt', '↑ / ↓'], 'Row above / below'],
       [['Ctrl', 'Enter'], 'Save cell to bank'],
       [['Alt', '1–6'], 'Tag: NU · DL · LT · IT · MIT · WGH'],
+      [['Alt', 'Z'], 'Explanation of the bank response on this line'],
       [['Esc'], 'Leave the cell'],
     ],
   },

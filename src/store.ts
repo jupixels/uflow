@@ -2,10 +2,16 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { type Clock, clampAtZero, makeClock, pause, reset, toggle } from './lib/timer';
 import type { SideLabels } from './lib/labels';
-import type { Role, Side } from './types';
+import type { Role, Side, Speech } from './types';
 
 export type View = 'bank' | 'case' | 'practice' | 'rounds' | 'flow';
-export type Panel = 'cx' | 'summary' | null;
+export type Panel = 'cx' | 'summary' | 'explain' | null;
+/** Flow cell shown in the explanations panel, and the response to highlight. */
+export interface ExplainTarget {
+  rowId: string;
+  speech: Speech;
+  focusedId?: string;
+}
 export type ThemeMode = 'dark' | 'light' | 'system';
 
 /** Accent color as an OKLCH hue (0–360) and chroma (0–0.25). */
@@ -42,6 +48,7 @@ interface AppState {
   readingFontSize: number;
   /** Side panel next to the flow. */
   panel: Panel;
+  explain: ExplainTarget | null;
   /** Open the crossfire panel automatically when the timer reaches a crossfire. */
   cxAuto: boolean;
   resolutionId: string | null;
@@ -64,6 +71,7 @@ interface AppState {
   setWpm: (n: number) => void;
   setReadingFontSize: (n: number) => void;
   setPanel: (p: Panel) => void;
+  setExplain: (t: ExplainTarget | null) => void;
   togglePanel: (p: Exclude<Panel, null>) => void;
   selectCase: (id: string | null) => void;
   practiceArgument: (id: string | null) => void;
@@ -105,6 +113,7 @@ export const useApp = create<AppState>()(
       wpm: 220,
       readingFontSize: 24,
       panel: null,
+      explain: null,
       cxAuto: true,
       resolutionId: null,
       argumentId: null,
@@ -131,6 +140,7 @@ export const useApp = create<AppState>()(
       setWpm: (wpm) => set({ wpm: Math.min(350, Math.max(100, Math.round(wpm))) }),
       setReadingFontSize: (readingFontSize) => set({ readingFontSize: Math.min(48, Math.max(14, readingFontSize)) }),
       setPanel: (panel) => set({ panel }),
+      setExplain: (explain) => set({ explain }),
       togglePanel: (p) => set({ panel: get().panel === p ? null : p }),
       selectCase: (caseId) => set({ caseId }),
       practiceArgument: (practiceArgumentId) => set(practiceArgumentId ? { practiceArgumentId, view: 'practice' } : { practiceArgumentId }),
