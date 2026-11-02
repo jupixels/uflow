@@ -38,6 +38,7 @@ CI (`.github/workflows/ci.yml`) runs lint, typecheck, test and build. Run all fo
 - A round has two flow sheets, one per case (`FlowRow.sheet`). Column order follows the real speaking order (`flowColumns(firstSide)`).
 - Hidden columns are stored per round and per sheet in `Round.hiddenCols`. A missing entry means "use `defaultHiddenColumns`".
 - An `Argument` with `caseId` is one of the user's own contentions. Its `BankResponse`s are frontlines (with `against`) and its `CxQuestion`s carry an `answer`. Without `caseId` it is an opponent argument.
+- `FlowCell.kind` is only the tag the user set with Alt+1–6. Badges for inserted bank responses are derived on render (`cellKinds` in `explain.ts`) from the responses still in the text; never write a response's kind onto the cell. Dexie v5 and pre-v5 imports clear tags that older versions copied from inserted responses (`withoutCopiedKind`).
 - Flashcard progress is a `Review` per bank response (`Review.id` = response id). Deleting a response, argument or resolution must delete its reviews too: any transaction that may cascade into `deleteArgument` has to include `db.reviews`. Full backups include reviews; a bank-only export leaves them out, so a partner starts fresh.
 - Roles (`REBUTTAL | CONSTRUCTIVE | BOTH`) only change defaults and visibility (Case tab, which sheet opens). Don't fork features by role.
 
@@ -48,7 +49,8 @@ CI (`.github/workflows/ci.yml`) runs lint, typecheck, test and build. Run all fo
 - **One-line effects must not return a value.** `useEffect(() => el.scrollIntoView())` crashed the app: Chromium returns a Promise from `scrollIntoView`, and React then tries to call it as a cleanup function. Wrap effect bodies in braces.
 - **Read the time during render for timers.** Store clocks as `{ durationMs, elapsedMs, startedAt }` and compute with `remaining(clock, Date.now())`. `useTicker` only forces re-renders. Caching "now" in state once made timers show extra seconds on start.
 - Side panels share one slot (`store.panel`: `cx` | `summary` | `explain`). State a panel needs after leaving and returning to the Flow tab (e.g. `store.explain`) lives in the store, not component state.
-- **Global shortcuts** (Space, N, P, X, S in `FlowView`) must ignore typing and any open `[role="dialog"]` or `[role="menu"]`.
+- Arrow keys in a cell move to the neighbouring cell only when the caret can't move further (`caret.ts` measures visual lines with a hidden mirror, so wrapped lines count). Keep Shift+arrows and selections as normal text editing.
+- **Global shortcuts** (Space, N, P, X, S, and Alt+Z to close the explanations panel, in `FlowView`) must ignore typing and any open `[role="dialog"]` or `[role="menu"]`.
 - **Updates:** a browser refresh does not pick up a new deploy while the service worker serves the cache. `UpdateBanner` in `App.tsx` applies updates automatically within 20 s of opening (if no clock is running) and otherwise shows a banner. Never auto-reload mid-round.
 - **Blank-page fallback:** `index.html` shows a "didn't load" message after 8 s if `#root` is still empty. It lists failed file loads and errors, and has a **Reset app files** button that unregisters the service worker and clears caches (never IndexedDB). Keep it plain inline JS so it works even when the bundle doesn't.
 - **Schema or export changes:** bump the Dexie version and `EXPORT_VERSION` together, add new tables to `TABLES` in `data.ts`, and keep older export versions importable.

@@ -53,3 +53,20 @@ describe('export / import', () => {
     expect(() => parseExport('{"app":"rebuttal-flow","version":1,"responses":[{}]}')).toThrow(/malformed/);
   });
 });
+
+describe('importing older backups', () => {
+  it('clears cell tags copied from inserted responses in pre-v5 backups only', async () => {
+    const res = await createResolution('Res');
+    const a = await createArgument(res.id, 'CON', 'Arg');
+    const r = await saveResponse({ argumentId: a.id, kind: 'NU', isCard: false, tag: 'T', text: '', strength: 2 });
+    const file = await exportAll();
+    const cell = { id: 'c1', roundId: 'x', rowId: 'w', speech: 'PR' as const, text: '[NU] T', kind: 'NU' as const, linkedResponseIds: [r.id] };
+    const manual = { ...cell, id: 'c2', kind: 'WEIGHING' as const };
+    await Promise.all(db.tables.map((t) => t.clear()));
+    await importAll({ ...file, version: 4, cells: [cell, manual] });
+    expect((await db.cells.get('c1'))?.kind).toBeUndefined();
+    expect((await db.cells.get('c2'))?.kind).toBe('WEIGHING');
+    await importAll({ ...file, cells: [cell] });
+    expect((await db.cells.get('c1'))?.kind).toBe('NU');
+  });
+});

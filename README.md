@@ -47,10 +47,11 @@ Press `?` anywhere to see them all.
 | `/` (at the start of a cell or after a space) | Quick insert from the bank and crossfire concessions |
 | `Enter` / `Shift+Enter` | New row below / new line in the cell |
 | `Tab` / `Shift+Tab` | Next / previous speech column (wraps to the next row) |
+| `↑` `↓` `←` `→` | Move to the next cell once the cursor can't go further in this one (top/bottom line, very start/end) |
 | `Alt+↑` / `Alt+↓` | Same column, row above / below |
 | `Ctrl+Enter` (`⌘+Enter` on Mac) | Save the cell to the bank as a new response |
-| `Alt+1`…`Alt+6` | Tag the cell NU, DL, LT, IT, MIT, WGH (press again to clear) |
-| `Alt+Z` | Show the explanation of the bank response on this line |
+| `Alt+1`…`Alt+6` | Tag the cell NU, DL, LT, IT, MIT, WGH (press again to clear). Responses inserted from the bank show their own type badge only while they're in the cell |
+| `Alt+Z` | Open the explanations panel at the bank response on this line; press again to close it |
 | `Space` · `N` | Start/pause the speech timer · next speech |
 | `P` / `Shift+P` | Start/pause our / their prep (only one runs at a time) |
 | `X` / `S` | Show/hide the crossfire panel / speech builder |

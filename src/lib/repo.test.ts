@@ -60,7 +60,9 @@ describe('repo', () => {
     await recordInsert(round.id, row.id, 'PR', r);
     const cells = await db.cells.where('rowId').equals(row.id).toArray();
     expect(cells).toHaveLength(1);
-    expect(cells[0]).toMatchObject({ text: 'hello', kind: 'DELINK', linkedResponseIds: [r.id] });
+    expect(cells[0]).toMatchObject({ text: 'hello', linkedResponseIds: [r.id] });
+    // The response's type is shown as a badge, not stored as the cell's own tag.
+    expect(cells[0].kind).toBeUndefined();
     expect((await db.responses.get(r.id))?.timesUsed).toBe(1);
 
     await deleteRound(round.id);

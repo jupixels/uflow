@@ -1,4 +1,5 @@
 import { db } from '../db';
+import { withoutCopiedKind } from './explain';
 import type {
   Argument,
   BankResponse,
@@ -13,7 +14,7 @@ import type {
   Round,
 } from '../types';
 
-export const EXPORT_VERSION = 4;
+export const EXPORT_VERSION = 5;
 
 export interface ExportFile {
   /** Internal file ID from the app's original name; kept so older backups still import. */
@@ -95,7 +96,12 @@ export async function importAll(file: ExportFile): Promise<ImportResult> {
     for (const t of TABLES) {
       let items = (file[t] ?? []) as { id: string }[];
       if (t === 'cells') {
-        items = (items as FlowCell[]).map((c) => ({ ...c, linkedResponseIds: c.linkedResponseIds ?? [] }));
+        const kinds = new Map((file.responses ?? []).map((r) => [r.id, r.kind]));
+        items = (items as FlowCell[]).map((c) => {
+          const cell = { ...c, linkedResponseIds: c.linkedResponseIds ?? [] };
+          // Backups from before v5 may carry cell tags copied from inserted responses.
+          return file.version < 5 ? withoutCopiedKind(cell, (id) => kinds.get(id)) : cell;
+        });
       }
       await db.table(t).bulkPut(items);
       counts[t] = items.length;
