@@ -18,6 +18,7 @@ import { DEFAULT_ARG_COL_WIDTH, DEFAULT_COL_WIDTH, confirmAction, toast, useApp 
 import { type BankResponse, type FlowRow, KIND_LABELS, type Side, type Speech } from '../types';
 import { ColumnMenu } from './ColumnMenu';
 import { CrossfirePanel } from './CrossfirePanel';
+import { ExplainPanel } from './ExplainPanel';
 import { type CellHandle, FlowCellEditor } from './FlowCellEditor';
 import { QuickInsert } from './QuickInsert';
 import { ReadingMode } from './ReadingMode';
@@ -26,6 +27,7 @@ import { SaveToBankDialog } from './SaveToBankDialog';
 import { TimerBar } from './TimerBar';
 import { EmptyState } from './ui';
 import { useLabels } from '../hooks/useLabels';
+import { responseAtCaret, responsesInCell } from '../lib/explain';
 
 type Target = { rowId: string; speech: Speech };
 const key = (rowId: string, speech: Speech) => `${rowId}:${speech}`;
@@ -86,6 +88,11 @@ export function FlowView({ onShortcuts }: { onShortcuts: () => void }) {
   const lastCell = useRef<Target | null>(null);
   const [insertFor, setInsertFor] = useState<Target | null>(null);
   const [saveFor, setSaveFor] = useState<Target | null>(null);
+  // Kept in the store so the panel still shows its cell after switching tabs.
+  const explain = useApp((s) => s.explain);
+  const setExplain = useApp((s) => s.setExplain);
+  const responseById = useMemo(() => new Map((responses ?? []).map((r) => [r.id, r])), [responses]);
+  const argById = useMemo(() => new Map((args ?? []).map((a) => [a.id, a])), [args]);
   const [readingCase, setReadingCase] = useState(false);
   const caseData = useLiveQuery(async () => {
     if (!round?.caseId) return null;
@@ -174,6 +181,13 @@ export function FlowView({ onShortcuts }: { onShortcuts: () => void }) {
     setHiddenColumns(round.id, sheet, hidden.includes(s) ? hidden.filter((h) => h !== s) : [...hidden, s]);
   const columnHasText = (s: Speech) => rows.some((r) => cellMap.get(key(r.id, s))?.text.trim());
 
+  /** Bank responses inserted into a cell that are still in its text (live text when given). */
+  const inCell = (rowId: string, speech: Speech, text?: string) => {
+    const c = cellMap.get(key(rowId, speech));
+    return c ? responsesInCell(text ?? c.text, c.linkedResponseIds, responseById) : [];
+  };
+  const explainRowIndex = explain ? rows.findIndex((r) => r.id === explain.rowId) : -1;
+
   const widthOf = (k: string) => colWidths[k] ?? (k === 'arg' ? DEFAULT_ARG_COL_WIDTH : DEFAULT_COL_WIDTH);
 
   const onCellKey = (row: FlowRow, rowIndex: number, speech: Speech) => (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -215,6 +229,18 @@ export function FlowView({ onShortcuts }: { onShortcuts: () => void }) {
       if (r) focus(r.id, speech);
       return;
     }
+    if (e.altKey && e.code === 'KeyZ') {
+      e.preventDefault();
+      const present = inCell(row.id, speech, ta.value);
+      if (!present.length) {
+        toast('No bank responses in this cell yet. Press / to insert one.');
+        return;
+      }
+      const atCaret = responseAtCaret(ta.value, ta.selectionStart, present);
+      setExplain({ rowId: row.id, speech, focusedId: (atCaret ?? present[0]).id });
+      setPanel('explain');
+      return;
+    }
     if (e.altKey && KIND_SHORTCUTS[e.code]) {
       e.preventDefault();
       const current = cellMap.get(key(row.id, speech))?.kind;
@@ -232,6 +258,7 @@ export function FlowView({ onShortcuts }: { onShortcuts: () => void }) {
     const own = args.find((a) => a.id === r.argumentId)?.caseId;
     handles.current.get(key(rowId, speech))?.appendLine(formatInsert(r, own ? 'FL' : KIND_LABELS[r.kind]));
     await recordInsert(round.id, rowId, speech, r);
+    if (useApp.getState().panel === 'explain') setExplain({ rowId, speech, focusedId: r.id });
     // Inserting into an unlinked row links it to that response's argument.
     const row = rows.find((x) => x.id === rowId);
     if (row && !row.argumentId) await linkRowArgument(rowId, r.argumentId);
@@ -463,7 +490,16 @@ export function FlowView({ onShortcuts }: { onShortcuts: () => void }) {
                           cell={cellMap.get(key(row.id, speech))}
                           placeholder={i === 0 && rows.length === 1 && speech === constructive ? (sheet === round.ourSide ? 'Flow your contention here…' : 'Flow their contention here…') : undefined}
                           onKeyDown={onCellKey(row, i, speech)}
-                          onFocus={() => (lastCell.current = { rowId: row.id, speech })}
+                          onFocus={() => {
+                            lastCell.current = { rowId: row.id, speech };
+                            // An open explanations panel follows you to cells that have bank responses.
+                            if (useApp.getState().panel === 'explain' && inCell(row.id, speech).length) setExplain({ rowId: row.id, speech });
+                          }}
+                          bankCount={inCell(row.id, speech).length}
+                          onExplain={() => {
+                            setExplain({ rowId: row.id, speech });
+                            setPanel('explain');
+                          }}
                         />
                       </div>
                       ),
@@ -487,6 +523,23 @@ export function FlowView({ onShortcuts }: { onShortcuts: () => void }) {
               linkedArgumentIds={linkedTheirArgs}
               ourArgumentIds={(ourRows ?? []).map((r) => r.argumentId).filter((x): x is string => !!x)}
               onInsert={insertIntoLastCell}
+              onClose={() => setPanel(null)}
+            />
+          </div>
+        )}
+        {panel === 'explain' && (
+          <div className="fixed top-13 right-0 bottom-0 z-30 w-full shadow-pop sm:w-auto lg:static lg:z-auto lg:shadow-none">
+            <ExplainPanel
+              target={explainRowIndex >= 0 && explain ? { speech: explain.speech, row: explainRowIndex + 1 } : null}
+              responses={explainRowIndex >= 0 && explain ? inCell(explain.rowId, explain.speech) : []}
+              args={argById}
+              focusedId={explain?.focusedId}
+              onEdit={(r) => {
+                const s = useApp.getState();
+                s.selectResolution(round.resolutionId);
+                s.selectArgument(r.argumentId);
+                s.setView('bank');
+              }}
               onClose={() => setPanel(null)}
             />
           </div>
