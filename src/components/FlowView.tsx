@@ -9,6 +9,8 @@ import {
   insertRow,
   linkRowArgument,
   recordInsert,
+  resetRoundEdit,
+  setRoundEdit,
   setHiddenColumns,
   toggleKind,
   updateCell,
@@ -29,6 +31,7 @@ import { EmptyState } from './ui';
 import { useLabels } from '../hooks/useLabels';
 import { onFirstLine, onLastLine } from '../lib/caret';
 import { cellKinds, responseAtCaret, responsesInCell } from '../lib/explain';
+import { applyEdit } from '../lib/roundEdits';
 
 type Target = { rowId: string; speech: Speech };
 const key = (rowId: string, speech: Speech) => `${rowId}:${speech}`;
@@ -92,7 +95,15 @@ export function FlowView({ onShortcuts }: { onShortcuts: () => void }) {
   // Kept in the store so the panel still shows its cell after switching tabs.
   const explain = useApp((s) => s.explain);
   const setExplain = useApp((s) => s.setExplain);
-  const responseById = useMemo(() => new Map((responses ?? []).map((r) => [r.id, r])), [responses]);
+  // Round-only edits: the explanations panel and "/" show each response as tailored for this round.
+  const roundEditList = useLiveQuery(() => (roundId ? db.roundEdits.where('roundId').equals(roundId).toArray() : []), [roundId]);
+  const roundResponses = useMemo(() => {
+    const byResponse = new Map((roundEditList ?? []).map((e) => [e.responseId, e]));
+    return (responses ?? []).map((r) => applyEdit(r, byResponse.get(r.id)));
+  }, [responses, roundEditList]);
+  const editedIds = useMemo(() => new Set((roundEditList ?? []).map((e) => e.responseId)), [roundEditList]);
+  const responseById = useMemo(() => new Map(roundResponses.map((r) => [r.id, r])), [roundResponses]);
+  const bankById = useMemo(() => new Map((responses ?? []).map((r) => [r.id, r])), [responses]);
   const argById = useMemo(() => new Map((args ?? []).map((a) => [a.id, a])), [args]);
   const [readingCase, setReadingCase] = useState(false);
   const caseData = useLiveQuery(async () => {
@@ -191,7 +202,8 @@ export function FlowView({ onShortcuts }: { onShortcuts: () => void }) {
   /** Bank responses inserted into a cell that are still in its text (live text when given). */
   const inCell = (rowId: string, speech: Speech, text?: string) => {
     const c = cellMap.get(key(rowId, speech));
-    return c ? responsesInCell(text ?? c.text, c.linkedResponseIds, responseById) : [];
+    // Also accept the bank wording, so a response doesn't flicker out while a tag change is saving.
+    return c ? responsesInCell(text ?? c.text, c.linkedResponseIds, responseById, bankById) : [];
   };
   const explainRowIndex = explain ? rows.findIndex((r) => r.id === explain.rowId) : -1;
 
@@ -560,8 +572,11 @@ export function FlowView({ onShortcuts }: { onShortcuts: () => void }) {
               target={explainRowIndex >= 0 && explain ? { speech: explain.speech, row: explainRowIndex + 1 } : null}
               responses={explainRowIndex >= 0 && explain ? inCell(explain.rowId, explain.speech) : []}
               args={argById}
+              edited={editedIds}
               focusedId={explain?.focusedId}
-              onEdit={(r) => {
+              onRoundEdit={(r, patch) => void setRoundEdit(round.id, r.id, patch)}
+              onReset={(r) => void resetRoundEdit(round.id, r.id)}
+              onEditInBank={(r) => {
                 const s = useApp.getState();
                 s.selectResolution(round.resolutionId);
                 s.selectArgument(r.argumentId);
@@ -598,7 +613,7 @@ export function FlowView({ onShortcuts }: { onShortcuts: () => void }) {
       )}
       {insertFor && (
         <QuickInsert
-          responses={responses}
+          responses={roundResponses}
           args={args}
           concessions={concessions ?? []}
           preferArgumentId={rows.find((r) => r.id === insertFor.rowId)?.argumentId}

@@ -18,13 +18,14 @@ CI (`.github/workflows/ci.yml`) runs lint, typecheck, test and build. Run all fo
 
 ## Layout
 
-- `src/types.ts`: the data model (Resolution, Argument, BankResponse, Round, FlowRow, FlowCell, CxQuestion, CxEntry, Case, CaseSection, Review).
+- `src/types.ts`: the data model (Resolution, Argument, BankResponse, Round, FlowRow, FlowCell, CxQuestion, CxEntry, Case, CaseSection, Review, RoundEdit).
 - `src/db.ts`: Dexie schema. **Never edit an existing `version(n)` block.** Add `version(n+1)` with only the changed or new tables.
 - `src/lib/`: pure logic and all DB writes. Components call these and never write to `db` directly.
   - `repo.ts`: CRUD and cascades (deleting a resolution, argument, round, case or section also deletes what hangs off it).
   - `speeches.ts`: PF speech order, timings, default hidden columns. `labels.ts`: Pro/Con vs Aff/Neg display names.
   - `flashcards.ts`: Leitner scheduling (`rate`), study queue and deck counts for the Practice tab.
   - `explain.ts`: which inserted bank responses are still in a cell's text (by tag, tolerant of small edits) and which one is on the caret line, for the explanations panel.
+  - `roundEdits.ts`: round-only tailoring of bank responses (`applyEdit`, `nextEdit`, `retagText`); `setRoundEdit` / `resetRoundEdit` in `repo.ts` also rewrite the round's flow lines when the tag changes.
   - `summary.ts`: speech-builder analysis and outline. `caseTime.ts`: word counts and time estimates.
   - `data.ts`: JSON export/import. `timer.ts`: clocks. `search.ts`: Fuse search. `cardParser.ts`: paste-a-card splitting.
   - `theme.ts`, `install.ts`, `update.ts`: accent color wheel, PWA install prompt, auto-update rule.
@@ -39,6 +40,7 @@ CI (`.github/workflows/ci.yml`) runs lint, typecheck, test and build. Run all fo
 - Hidden columns are stored per round and per sheet in `Round.hiddenCols`. A missing entry means "use `defaultHiddenColumns`".
 - An `Argument` with `caseId` is one of the user's own contentions. Its `BankResponse`s are frontlines (with `against`) and its `CxQuestion`s carry an `answer`. Without `caseId` it is an opponent argument.
 - `FlowCell.kind` is only the tag the user set with Alt+1–6. Badges for inserted bank responses are derived on render (`cellKinds` in `explain.ts`) from the responses still in the text; never write a response's kind onto the cell. Dexie v5 and pre-v5 imports clear tags that older versions copied from inserted responses (`withoutCopiedKind`).
+- A `RoundEdit` (`id` = `${roundId}:${responseId}`) holds only what differs from the bank for one round. Inside a round, show and insert responses through `applyEdit`; everywhere else (Bank, Practice, other rounds) use the bank version. Edits go with their round and their response (same cascade rule as reviews: include `db.roundEdits`), are in full backups and left out of bank-only exports.
 - Flashcard progress is a `Review` per bank response (`Review.id` = response id). Deleting a response, argument or resolution must delete its reviews too: any transaction that may cascade into `deleteArgument` has to include `db.reviews`. Full backups include reviews; a bank-only export leaves them out, so a partner starts fresh.
 - Roles (`REBUTTAL | CONSTRUCTIVE | BOTH`) only change defaults and visibility (Case tab, which sheet opens). Don't fork features by role.
 

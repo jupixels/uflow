@@ -16,12 +16,22 @@ export function lineHasResponse(line: string, r: BankResponse): boolean {
  * Bank responses inserted into a cell that are still in its text, in the
  * order they appear. A response whose line was deleted no longer counts.
  */
-export function responsesInCell(text: string, linkedIds: string[], byId: Map<string, BankResponse>): BankResponse[] {
+export function responsesInCell(
+  text: string,
+  linkedIds: string[],
+  byId: Map<string, BankResponse>,
+  /** Other wording to accept, e.g. the bank version while a round-only tag change is saving. */
+  alsoById?: Map<string, BankResponse>,
+): BankResponse[] {
   const lines = text.split('\n');
+  const matches = (l: string, r: BankResponse) => {
+    const alt = alsoById?.get(r.id);
+    return lineHasResponse(l, r) || (!!alt && lineHasResponse(l, alt));
+  };
   return linkedIds
     .map((id) => byId.get(id))
     .filter((r): r is BankResponse => !!r)
-    .map((r) => ({ r, at: lines.findIndex((l) => lineHasResponse(l, r)) }))
+    .map((r) => ({ r, at: lines.findIndex((l) => matches(l, r)) }))
     .filter((x) => x.at >= 0)
     .sort((a, b) => a.at - b.at)
     .map((x) => x.r);

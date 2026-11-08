@@ -1,5 +1,6 @@
 import { db, newId } from '../db';
 import { type Grade, rate } from './flashcards';
+import { nextEdit, retagText, roundEditId } from './roundEdits';
 import type {
   Argument,
   BankResponse,
@@ -13,6 +14,7 @@ import type {
   ResponseKind,
   Review,
   Round,
+  RoundEdit,
   Side,
   Speech,
 } from '../types';
@@ -26,9 +28,11 @@ export async function createResolution(title: string, monthRange?: string): Prom
 }
 
 export async function deleteResolution(id: string) {
-  await db.transaction('rw', [db.resolutions, db.args, db.responses, db.questions, db.reviews], async () => {
+  await db.transaction('rw', [db.resolutions, db.args, db.responses, db.questions, db.reviews, db.roundEdits], async () => {
     const argIds = (await db.args.where('resolutionId').equals(id).toArray()).map((a) => a.id);
-    await db.reviews.bulkDelete(await db.responses.where('argumentId').anyOf(argIds).primaryKeys());
+    const responseIds = await db.responses.where('argumentId').anyOf(argIds).primaryKeys();
+    await db.reviews.bulkDelete(responseIds);
+    await db.roundEdits.where('responseId').anyOf(responseIds).delete();
     await db.responses.where('argumentId').anyOf(argIds).delete();
     await db.questions.where('argumentId').anyOf(argIds).delete();
     await db.args.bulkDelete(argIds);
@@ -43,8 +47,10 @@ export async function createArgument(resolutionId: string, side: Side, title: st
 }
 
 export async function deleteArgument(id: string) {
-  await db.transaction('rw', [db.args, db.responses, db.questions, db.rows, db.reviews], async () => {
-    await db.reviews.bulkDelete(await db.responses.where('argumentId').equals(id).primaryKeys());
+  await db.transaction('rw', [db.args, db.responses, db.questions, db.rows, db.reviews, db.roundEdits], async () => {
+    const responseIds = await db.responses.where('argumentId').equals(id).primaryKeys();
+    await db.reviews.bulkDelete(responseIds);
+    await db.roundEdits.where('responseId').anyOf(responseIds).delete();
     await db.responses.where('argumentId').equals(id).delete();
     await db.questions.where('argumentId').equals(id).delete();
     await db.args.delete(id);
@@ -69,9 +75,10 @@ export async function saveResponse(draft: ResponseDraft): Promise<BankResponse> 
 }
 
 export async function deleteResponse(id: string) {
-  await db.transaction('rw', [db.responses, db.reviews], async () => {
+  await db.transaction('rw', [db.responses, db.reviews, db.roundEdits], async () => {
     await db.responses.delete(id);
     await db.reviews.delete(id);
+    await db.roundEdits.where('responseId').equals(id).delete();
   });
 }
 
@@ -94,8 +101,9 @@ export async function createRound(draft: RoundDraft): Promise<Round> {
 }
 
 export async function deleteRound(id: string) {
-  await db.transaction('rw', [db.rounds, db.rows, db.cells, db.cx], async () => {
+  await db.transaction('rw', [db.rounds, db.rows, db.cells, db.cx, db.roundEdits], async () => {
     await db.cells.where('roundId').equals(id).delete();
+    await db.roundEdits.where('roundId').equals(id).delete();
     await db.cx.where('roundId').equals(id).delete();
     await db.rows.where('roundId').equals(id).delete();
     await db.rounds.delete(id);
@@ -257,7 +265,7 @@ async function dropUnusedContentions(argIds: string[]) {
 }
 
 export async function deleteCase(id: string) {
-  await db.transaction('rw', [db.cases, db.sections, db.args, db.responses, db.questions, db.rows, db.rounds, db.reviews], async () => {
+  await db.transaction('rw', [db.cases, db.sections, db.args, db.responses, db.questions, db.rows, db.rounds, db.reviews, db.roundEdits], async () => {
     const sections = await db.sections.where('caseId').equals(id).toArray();
     await db.sections.where('caseId').equals(id).delete();
     await db.cases.delete(id);
@@ -312,7 +320,7 @@ export async function moveSection(id: string, dir: -1 | 1) {
 }
 
 export async function deleteSection(id: string) {
-  await db.transaction('rw', [db.sections, db.args, db.responses, db.questions, db.rows, db.reviews], async () => {
+  await db.transaction('rw', [db.sections, db.args, db.responses, db.questions, db.rows, db.reviews, db.roundEdits], async () => {
     const s = await db.sections.get(id);
     if (!s) return;
     await db.sections.delete(id);
@@ -350,3 +358,37 @@ export async function recordReview(responseId: string, grade: Grade, now = Date.
 }
 
 export const resetReviews = (responseIds: string[]) => db.reviews.bulkDelete(responseIds);
+
+// ---- Round-only edits ----
+
+/**
+ * Change a bank response for one round only. When the tag changes, the round's
+ * flow cells that hold the response are updated to the new wording.
+ */
+export async function setRoundEdit(roundId: string, responseId: string, patch: { tag?: string; text?: string }): Promise<RoundEdit | null> {
+  return db.transaction('rw', [db.roundEdits, db.responses, db.cells], async () => {
+    const base = await db.responses.get(responseId);
+    if (!base) return null;
+    const id = roundEditId(roundId, responseId);
+    const prev = await db.roundEdits.get(id);
+    const next = nextEdit(base, prev, roundId, patch, Date.now());
+    if (next) await db.roundEdits.put(next);
+    else await db.roundEdits.delete(id);
+    const oldTag = prev?.tag ?? base.tag;
+    const newTag = next?.tag ?? base.tag;
+    if (oldTag !== newTag) {
+      const cells = await db.cells.where('roundId').equals(roundId).filter((c) => c.linkedResponseIds.includes(responseId)).toArray();
+      for (const c of cells) {
+        const text = retagText(c.text, oldTag, newTag);
+        if (text !== c.text) await db.cells.update(c.id, { text });
+      }
+    }
+    return next;
+  });
+}
+
+/** Go back to the bank version for this round. */
+export async function resetRoundEdit(roundId: string, responseId: string) {
+  const base = await db.responses.get(responseId);
+  if (base) await setRoundEdit(roundId, responseId, { tag: base.tag, text: base.text });
+}

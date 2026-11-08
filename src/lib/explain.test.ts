@@ -61,3 +61,12 @@ describe('cell badges', () => {
     expect(withoutCopiedKind({ ...cell, linkedResponseIds: [] }, kindOf).kind).toBe('NU');
   });
 });
+
+describe('round-only wording', () => {
+  it('also finds a response by its bank wording while a tag change is saving', () => {
+    const edited = new Map([['nu', { ...nu, tag: 'Jobs declining in Ohio' }]]);
+    const text = '[NU] Plastics jobs already declining from automation';
+    expect(responsesInCell(text, ['nu'], edited)).toEqual([]);
+    expect(responsesInCell(text, ['nu'], edited, byId).map((r) => r.tag)).toEqual(['Jobs declining in Ohio']);
+  });
+});
