@@ -171,3 +171,13 @@ export interface Review {
   reps: number;
   lapses: number;
 }
+
+/** A change to a bank response made for one round only; `id` is `${roundId}:${responseId}`. */
+export interface RoundEdit {
+  id: string;
+  roundId: string;
+  responseId: string;
+  tag?: string;
+  text?: string;
+  updatedAt: number;
+}

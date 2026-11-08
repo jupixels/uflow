@@ -12,6 +12,7 @@ import type {
   Resolution,
   Review,
   Round,
+  RoundEdit,
 } from './types';
 
 export class FlowDB extends Dexie {
@@ -26,6 +27,7 @@ export class FlowDB extends Dexie {
   cases!: EntityTable<Case, 'id'>;
   sections!: EntityTable<CaseSection, 'id'>;
   reviews!: EntityTable<Review, 'id'>;
+  roundEdits!: EntityTable<RoundEdit, 'id'>;
 
   // The database keeps the app's original name so existing data is found.
   constructor(name = 'rebuttal-flow') {
@@ -62,6 +64,9 @@ export class FlowDB extends Dexie {
             ref.value = withoutCopiedKind(cell, (id) => kinds.get(id));
           });
       });
+    this.version(6).stores({
+      roundEdits: 'id, roundId, responseId',
+    });
   }
 }
 

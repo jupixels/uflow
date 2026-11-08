@@ -12,9 +12,10 @@ import type {
   Resolution,
   Review,
   Round,
+  RoundEdit,
 } from '../types';
 
-export const EXPORT_VERSION = 5;
+export const EXPORT_VERSION = 6;
 
 export interface ExportFile {
   /** Internal file ID from the app's original name; kept so older backups still import. */
@@ -32,12 +33,13 @@ export interface ExportFile {
   cases: Case[];
   sections: CaseSection[];
   reviews: Review[];
+  roundEdits: RoundEdit[];
 }
 
-const TABLES = ['resolutions', 'args', 'responses', 'rounds', 'rows', 'cells', 'questions', 'cx', 'cases', 'sections', 'reviews'] as const;
+const TABLES = ['resolutions', 'args', 'responses', 'rounds', 'rows', 'cells', 'questions', 'cx', 'cases', 'sections', 'reviews', 'roundEdits'] as const;
 
 export async function exportAll(): Promise<ExportFile> {
-  const [resolutions, args, responses, rounds, rows, cells, questions, cx, cases, sections, reviews] = await Promise.all(
+  const [resolutions, args, responses, rounds, rows, cells, questions, cx, cases, sections, reviews, roundEdits] = await Promise.all(
     TABLES.map((t) => db.table(t).toArray()),
   );
   return {
@@ -55,6 +57,7 @@ export async function exportAll(): Promise<ExportFile> {
     cases,
     sections,
     reviews,
+    roundEdits,
   } as ExportFile;
 }
 
@@ -131,6 +134,7 @@ export async function exportBank(resolutionId?: string): Promise<ExportFile> {
     rows: [],
     cells: [],
     cx: [],
+    roundEdits: [],
   };
 }
 
