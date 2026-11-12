@@ -1,8 +1,9 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { ArrowRight, CalendarDays, Gavel, Play, Trash2, Users } from 'lucide-react';
+import { ArrowRight, CalendarDays, FileSpreadsheet, Gavel, Play, Trash2, Users } from 'lucide-react';
 import { useState } from 'react';
 import { db } from '../db';
 import { useOpenRound } from '../hooks/useOpenRound';
+import { exportFlowFile } from '../lib/export/run';
 import { createResolution, createRound, deleteRound } from '../lib/repo';
 import { confirmAction, toast, useApp } from '../store';
 import type { JudgeType, Side } from '../types';
@@ -235,6 +236,18 @@ export function RoundsView() {
                   <div className="mt-4 flex items-center gap-2">
                     <button className={`btn btn-sm ${isOpen ? 'btn-primary' : ''}`} onClick={() => open(r)}>
                       <Play size={13} /> {isOpen ? 'Resume' : 'Open'}
+                    </button>
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      title="Download this flow as an Excel spreadsheet"
+                      onClick={() =>
+                        exportFlowFile(r.id, useApp.getState().sideLabels).then(
+                          () => toast('Excel file downloaded.', 'success'),
+                          (e) => toast(e instanceof Error ? e.message : 'Export failed.', 'error'),
+                        )
+                      }
+                    >
+                      <FileSpreadsheet size={13} /> Excel
                     </button>
                     <button
                       className="btn btn-ghost btn-sm btn-danger ml-auto opacity-0 group-hover:opacity-100 focus:opacity-100 pointer-coarse:opacity-100"

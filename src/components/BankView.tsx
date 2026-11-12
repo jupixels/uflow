@@ -1,6 +1,7 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
   BookOpen,
+  FileDown,
   Layers,
   ChevronDown,
   ExternalLink,
@@ -30,6 +31,7 @@ import { loadSampleBank } from '../lib/sample';
 import { confirmAction, toast, useApp } from '../store';
 import { type Argument, type BankResponse, type CxQuestion, KIND_LABELS, KIND_NAMES, RESPONSE_KINDS, type ResponseKind, type Side } from '../types';
 import { KindBadge } from './KindBadge';
+import { ExportBankDialog } from './ExportBankDialog';
 import { ResponseEditor, type ResponseEditorHandle } from './ResponseEditor';
 import { EmptyState, Modal, ModalHeader } from './ui';
 import { useLabels } from '../hooks/useLabels';
@@ -49,6 +51,8 @@ export function BankView() {
     return m;
   }, [args]);
 
+  const [exporting, setExporting] = useState(false);
+
   // Default to the first resolution so the screen is never empty when data exists.
   useEffect(() => {
     if (resolutions?.length && !resolutions.some((r) => r.id === resolutionId)) selectResolution(resolutions[0].id);
@@ -61,11 +65,21 @@ export function BankView() {
   if (resolutions.length === 0) return <Welcome onCreated={selectResolution} />;
 
   const argument = args?.find((a) => a.id === argumentId);
+  const exportDialog = exporting && resolutionId && (
+    <ExportBankDialog resolutionId={resolutionId} argument={argument} onClose={() => setExporting(false)} />
+  );
 
   return (
     <div className="flex h-full flex-col md:flex-row">
       <aside className="flex max-h-[45vh] shrink-0 flex-col border-b border-line bg-surface md:max-h-none md:w-72 md:border-r md:border-b-0">
         <ResolutionPicker />
+        {resolutionId && (
+          <div className="border-b border-line px-3 py-2">
+            <button className="nav-item text-muted" onClick={() => setExporting(true)}>
+              <FileDown size={15} /> Export to Word or PDF
+            </button>
+          </div>
+        )}
         <div className="min-h-0 flex-1 overflow-auto px-3 pb-4">
           {(['CON', 'PRO'] as Side[]).map((side) => (
             <ArgumentGroup
@@ -80,6 +94,7 @@ export function BankView() {
           <OwnContentions args={args?.filter((a) => a.caseId) ?? []} counts={counts} selectedId={argumentId} onSelect={selectArgument} />
         </div>
       </aside>
+      {exportDialog}
       <section className="min-h-0 min-w-0 flex-1 overflow-auto">
         {argument ? (
           <ArgumentDetail key={argument.id} argument={argument} />
