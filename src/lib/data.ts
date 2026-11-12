@@ -138,12 +138,15 @@ export async function exportBank(resolutionId?: string): Promise<ExportFile> {
   };
 }
 
-export function downloadJson(file: ExportFile, name: string) {
-  const blob = new Blob([JSON.stringify(file, null, 2)], { type: 'application/json' });
+export function downloadBlob(blob: Blob, name: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
   a.download = name;
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+export function downloadJson(file: ExportFile, name: string) {
+  downloadBlob(new Blob([JSON.stringify(file, null, 2)], { type: 'application/json' }), name);
 }

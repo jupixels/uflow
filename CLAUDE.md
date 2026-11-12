@@ -28,6 +28,7 @@ CI (`.github/workflows/ci.yml`) runs lint, typecheck, test and build. Run all fo
   - `roundEdits.ts`: round-only tailoring of bank responses (`applyEdit`, `nextEdit`, `retagText`); `setRoundEdit` / `resetRoundEdit` in `repo.ts` also rewrite the round's flow lines when the tag changes.
   - `summary.ts`: speech-builder analysis and outline. `caseTime.ts`: word counts and time estimates.
   - `data.ts`: JSON export/import. `timer.ts`: clocks. `search.ts`: Fuse search. `cardParser.ts`: paste-a-card splitting.
+  - `export/`: `model.ts` turns bank / round data into document models (pure, tested); `docx.ts`, `pdf.ts`, `xlsx.ts` render them with docx, pdfmake and exceljs; `run.ts` reads the DB and downloads. Renderers are loaded with dynamic `import()` so they stay out of the main bundle; the PWA precache limit is raised so they still work offline.
   - `theme.ts`, `install.ts`, `update.ts`: accent color wheel, PWA install prompt, auto-update rule.
 - `src/store.ts`: Zustand UI state (settings, selection, timers, side panel), persisted to localStorage, plus toasts and `confirmAction()`.
 - `src/components/`: one file per screen or panel (`BankView`, `CaseView`, `PracticeView`, `RoundsView`, `FlowView`, `CrossfirePanel`, `SummaryPanel`, `ExplainPanel`, `ReadingMode`, `SettingsPanel`). Shared pieces live in `ui.tsx`.

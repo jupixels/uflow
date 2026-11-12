@@ -48,9 +48,15 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
+        // The Word/PDF/Excel exporters are big but must work offline too.
+        maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
       },
     }),
   ],
+  build: {
+    // The Word/PDF/Excel exporters are large on purpose and only load when you export.
+    chunkSizeWarningLimit: 2500,
+  },
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],

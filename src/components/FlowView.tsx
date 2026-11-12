@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { BookOpenText, Columns3, Keyboard, Link2, ListChecks, MessagesSquare, Plus, Trash2 } from 'lucide-react';
+import { BookOpenText, Columns3, FileSpreadsheet, Keyboard, Link2, ListChecks, MessagesSquare, Plus, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { db } from '../db';
 import {
@@ -31,6 +31,7 @@ import { EmptyState } from './ui';
 import { useLabels } from '../hooks/useLabels';
 import { onFirstLine, onLastLine } from '../lib/caret';
 import { cellKinds, responseAtCaret, responsesInCell } from '../lib/explain';
+import { exportFlowFile } from '../lib/export/run';
 import { applyEdit } from '../lib/roundEdits';
 
 type Target = { rowId: string; speech: Speech };
@@ -391,6 +392,18 @@ export function FlowView({ onShortcuts }: { onShortcuts: () => void }) {
               {[round.tournament, round.roundName, round.opponents && `vs ${round.opponents}`].filter(Boolean).join(' · ')}
             </span>
             <div className="ml-auto flex items-center gap-1.5">
+              <button
+                className="btn btn-ghost btn-sm"
+                title="Download this flow as an Excel spreadsheet"
+                onClick={() =>
+                  exportFlowFile(round.id, useApp.getState().sideLabels).then(
+                    () => toast('Excel file downloaded.', 'success'),
+                    (e) => toast(e instanceof Error ? e.message : 'Export failed.', 'error'),
+                  )
+                }
+              >
+                <FileSpreadsheet size={14} /> Excel
+              </button>
               <button
                 className="btn btn-ghost btn-sm"
                 onClick={(e) => {
